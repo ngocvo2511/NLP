@@ -175,15 +175,21 @@ def main() -> None:
         training_kwargs["evaluation_strategy"] = "epoch"
     training_args = TrainingArguments(**training_kwargs)
 
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_dataset,
-        eval_dataset=dev_dataset,
-        tokenizer=tokenizer,
-        data_collator=data_collator,
-        compute_metrics=lambda pred: compute_token_metrics(pred, label2id["O"]),
-    )
+    trainer_kwargs = {
+        "model": model,
+        "args": training_args,
+        "train_dataset": train_dataset,
+        "eval_dataset": dev_dataset,
+        "data_collator": data_collator,
+        "compute_metrics": lambda pred: compute_token_metrics(pred, label2id["O"]),
+    }
+    trainer_signature = inspect.signature(Trainer.__init__)
+    if "processing_class" in trainer_signature.parameters:
+        trainer_kwargs["processing_class"] = tokenizer
+    elif "tokenizer" in trainer_signature.parameters:
+        trainer_kwargs["tokenizer"] = tokenizer
+
+    trainer = Trainer(**trainer_kwargs)
     trainer.train()
     metrics = trainer.evaluate()
     trainer.save_model(args.output_dir)
