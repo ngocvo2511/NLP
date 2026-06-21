@@ -34,6 +34,7 @@ Build a Vietnamese aspect-based sentiment analysis system that predicts opinion 
 
 5. Evaluation
    - Convert model BIO predictions back to spans.
+   - Post-process predictions by merging nearby same-label fragments and removing very short spans.
    - Evaluate exact span + label micro precision, recall, and F1.
    - Report scores by aspect and polarity.
 

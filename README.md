@@ -56,6 +56,13 @@ Evaluate predictions:
 py -3.14 -m src.absa.evaluate --gold data/dev.jsonl --pred outputs/keyword_dev_predictions.jsonl
 ```
 
+Post-process transformer predictions before final evaluation:
+
+```powershell
+py -3.14 -m src.absa.postprocess_predictions --input outputs/xlmr_dev_predictions.jsonl --output outputs/xlmr_dev_predictions_pp.jsonl --min-span-chars 6 --merge-gap 30
+py -3.14 -m src.absa.evaluate --gold data/dev.jsonl --pred outputs/xlmr_dev_predictions_pp.jsonl --json-output outputs/xlmr_dev_metrics_pp.json
+```
+
 Fine-tune a transformer, preferably on Colab/Kaggle GPU:
 
 ```bash
@@ -78,6 +85,7 @@ python -m src.absa.train_transformer --model-name vinai/phobert-base-v2 --data-d
 - Dataset description: split sizes, aspect distribution, sentiment distribution.
 - Task formulation: span extraction plus aspect-polarity classification.
 - Preprocessing: offset validation, BIO conversion, tokenizer alignment.
+- Post-processing: merge nearby same-label fragments and filter very short spans.
 - Baseline: keyword baseline or CRF/BiLSTM if added later.
 - Main model: XLM-R or PhoBERT token classification.
 - Evaluation: exact span + label micro precision, recall, F1.

@@ -2,6 +2,7 @@ import unittest
 
 from src.absa.data import Example, SpanLabel
 from src.absa.metrics import evaluate_exact
+from src.absa.postprocess import postprocess_spans
 from src.absa.tags import bio_to_spans, spans_to_bio
 
 
@@ -33,6 +34,17 @@ class AbsaCoreTests(unittest.TestCase):
         result = evaluate_exact(gold, pred)
 
         self.assertEqual(result["micro"]["f1"], 1.0)
+
+    def test_postprocess_merges_nearby_same_label_and_filters_short_spans(self):
+        spans = [
+            SpanLabel(0, 3, "BATTERY#POSITIVE"),
+            SpanLabel(5, 10, "BATTERY#POSITIVE"),
+            SpanLabel(12, 13, "CAMERA#NEGATIVE"),
+        ]
+
+        result = postprocess_spans(spans, "pin x trau y c", min_chars=4, merge_gap=2)
+
+        self.assertEqual(result, [SpanLabel(0, 10, "BATTERY#POSITIVE")])
 
 
 if __name__ == "__main__":

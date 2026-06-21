@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 
 from .data import SpanLabel, read_jsonl, write_jsonl
+from .postprocess import postprocess_spans
 
 
 def require_deps():
@@ -58,6 +59,8 @@ def main() -> None:
     parser.add_argument("--output", required=True)
     parser.add_argument("--max-length", type=int, default=256)
     parser.add_argument("--batch-size", type=int, default=16)
+    parser.add_argument("--min-span-chars", type=int, default=1)
+    parser.add_argument("--merge-gap", type=int, default=-1)
     args = parser.parse_args()
 
     torch, AutoModelForTokenClassification, AutoTokenizer = require_deps()
@@ -88,6 +91,7 @@ def main() -> None:
         for ex, row_ids, row_offsets in zip(batch, pred_ids, offsets):
             tags = [model.config.id2label[int(idx)] for idx in row_ids]
             spans = tags_to_spans(tags, [tuple(offset) for offset in row_offsets])
+            spans = postprocess_spans(spans, ex.text, min_chars=args.min_span_chars, merge_gap=args.merge_gap)
             labels = [[span.start, span.end, span.label] for span in spans if span.start < span.end <= len(ex.text)]
             rows.append({"text": ex.text, "labels": labels})
 
