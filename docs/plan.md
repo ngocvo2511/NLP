@@ -30,13 +30,15 @@ Build a Vietnamese aspect-based sentiment analysis system that predicts opinion 
 4. Main model
    - Fine-tune `FacebookAI/xlm-roberta-base` first.
    - Try `vinai/phobert-base-v2` as a Vietnamese-specific comparison.
+   - Try `BILOU` tags as a clean boundary-modeling improvement over `BIO`.
+   - Try train-set-derived class weights to reduce polarity/aspect imbalance.
    - Train on Colab/Kaggle GPU, then download outputs locally.
 
 5. Evaluation
    - Convert model BIO predictions back to spans.
-   - Post-process predictions by merging nearby same-label fragments and removing very short spans.
    - Evaluate exact span + label micro precision, recall, and F1.
    - Report scores by aspect and polarity.
+   - Keep heuristic post-processing, if used, as a separate ablation result rather than the main score.
 
 6. Error analysis
    - Boundary errors: correct label but span too short/long.

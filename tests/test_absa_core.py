@@ -3,7 +3,7 @@ import unittest
 from src.absa.data import Example, SpanLabel
 from src.absa.metrics import evaluate_exact
 from src.absa.postprocess import postprocess_spans
-from src.absa.tags import bio_to_spans, spans_to_bio
+from src.absa.tags import bio_to_spans, spans_to_bio, spans_to_tags, tags_to_spans
 
 
 class AbsaCoreTests(unittest.TestCase):
@@ -15,6 +15,21 @@ class AbsaCoreTests(unittest.TestCase):
 
         self.assertEqual(tags[:2], ["B-BATTERY#POSITIVE", "I-BATTERY#POSITIVE"])
         self.assertEqual(spans, [SpanLabel(0, 8, "BATTERY#POSITIVE")])
+
+    def test_bilou_roundtrip_for_single_and_multi_token_spans(self):
+        ex = Example(
+            "Pin khỏe camera tệ",
+            [
+                SpanLabel(0, 8, "BATTERY#POSITIVE"),
+                SpanLabel(9, 15, "CAMERA#NEGATIVE"),
+            ],
+        )
+
+        tags, token_spans = spans_to_tags(ex, scheme="bilou")
+        spans = tags_to_spans(tags, token_spans)
+
+        self.assertEqual(tags[:3], ["B-BATTERY#POSITIVE", "L-BATTERY#POSITIVE", "U-CAMERA#NEGATIVE"])
+        self.assertEqual(spans, ex.labels)
 
     def test_exact_metric(self):
         gold = [Example("abc", [SpanLabel(0, 3, "GENERAL#POSITIVE")])]

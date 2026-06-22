@@ -8,12 +8,12 @@ from pathlib import Path
 import numpy as np
 
 from .data import read_jsonl
-from .tags import build_bio_labels
+from .tags import build_sequence_labels, tag_prefix
 
 
 def require_transformer_deps():
     try:
-        import torch  # noqa: F401
+        import torch
         from transformers import (
             AutoModelForTokenClassification,
             AutoTokenizer,
@@ -26,7 +26,7 @@ def require_transformer_deps():
         raise SystemExit(
             "Missing transformer dependencies. Install with: pip install -r requirements.txt"
         ) from exc
-    return AutoModelForTokenClassification, AutoTokenizer, DataCollatorForTokenClassification, Trainer, TrainingArguments, set_seed
+    return torch, AutoModelForTokenClassification, AutoTokenizer, DataCollatorForTokenClassification, Trainer, TrainingArguments, set_seed
 
 
 class AbsDataset:
@@ -40,7 +40,7 @@ class AbsDataset:
         return {key: value[idx] for key, value in self.encodings.items()}
 
 
-def encode_examples(examples, tokenizer, label2id: dict[str, int], max_length: int) -> dict:
+def encode_examples(examples, tokenizer, label2id: dict[str, int], max_length: int, tag_scheme: str) -> dict:
     texts = [ex.text for ex in examples]
     tokenized = tokenizer(
         texts,
@@ -64,7 +64,7 @@ def encode_examples(examples, tokenizer, label2id: dict[str, int], max_length: i
                 if not (start == 0 and end == 0) and start < span.end and end > span.start
             ]
             for pos, token_idx in enumerate(covered):
-                prefix = "B" if pos == 0 else "I"
+                prefix = tag_prefix(pos, len(covered), tag_scheme)
                 labels[token_idx] = label2id[f"{prefix}-{span.label}"]
 
         for i, (start, end) in enumerate(offsets):
@@ -76,6 +76,43 @@ def encode_examples(examples, tokenizer, label2id: dict[str, int], max_length: i
     tokenized.pop("offset_mapping")
     tokenized["labels"] = all_labels
     return tokenized
+
+
+def make_class_weights(label_rows: list[list[int]], num_labels: int, mode: str, torch):
+    if mode == "none":
+        return None
+
+    counts = np.zeros(num_labels, dtype=np.float64)
+    for row in label_rows:
+        for label_id in row:
+            if label_id != -100:
+                counts[label_id] += 1
+
+    nonzero = counts[counts > 0]
+    if len(nonzero) == 0:
+        return None
+
+    total = nonzero.sum()
+    weights = np.ones(num_labels, dtype=np.float32)
+    for idx, count in enumerate(counts):
+        if count > 0:
+            balanced = total / (len(nonzero) * count)
+            weights[idx] = balanced ** 0.5 if mode == "sqrt-balanced" else balanced
+    return torch.tensor(weights, dtype=torch.float32)
+
+
+def make_weighted_trainer(base_trainer, class_weights, torch):
+    class WeightedTokenClassificationTrainer(base_trainer):
+        def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
+            labels = inputs.get("labels")
+            outputs = model(**inputs)
+            logits = outputs.get("logits")
+            weights = class_weights.to(logits.device)
+            loss_fct = torch.nn.CrossEntropyLoss(weight=weights, ignore_index=-100)
+            loss = loss_fct(logits.view(-1, model.config.num_labels), labels.view(-1))
+            return (loss, outputs) if return_outputs else loss
+
+    return WeightedTokenClassificationTrainer
 
 
 def compute_token_metrics(eval_pred, o_label_id: int) -> dict[str, float]:
@@ -118,9 +155,12 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--learning-rate", type=float, default=2e-5)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--tag-scheme", default="bio", choices=["bio", "bilou"])
+    parser.add_argument("--class-weight", default="none", choices=["none", "balanced", "sqrt-balanced"])
     args = parser.parse_args()
 
     (
+        torch,
         AutoModelForTokenClassification,
         AutoTokenizer,
         DataCollatorForTokenClassification,
@@ -134,7 +174,7 @@ def main() -> None:
     train_examples = read_jsonl(data_dir / "train.jsonl")
     dev_examples = read_jsonl(data_dir / "dev.jsonl")
     span_labels = sorted({label.label for ex in train_examples + dev_examples for label in ex.labels})
-    labels = build_bio_labels(span_labels)
+    labels = build_sequence_labels(span_labels, scheme=args.tag_scheme)
     label2id = {label: i for i, label in enumerate(labels)}
     id2label = {i: label for label, i in label2id.items()}
 
@@ -142,8 +182,10 @@ def main() -> None:
     if not tokenizer.is_fast:
         raise SystemExit(f"{args.model_name} does not provide a fast tokenizer with offset mappings.")
 
-    train_dataset = AbsDataset(encode_examples(train_examples, tokenizer, label2id, args.max_length))
-    dev_dataset = AbsDataset(encode_examples(dev_examples, tokenizer, label2id, args.max_length))
+    train_encodings = encode_examples(train_examples, tokenizer, label2id, args.max_length, args.tag_scheme)
+    dev_encodings = encode_examples(dev_examples, tokenizer, label2id, args.max_length, args.tag_scheme)
+    train_dataset = AbsDataset(train_encodings)
+    dev_dataset = AbsDataset(dev_encodings)
 
     model = AutoModelForTokenClassification.from_pretrained(
         args.model_name,
@@ -175,6 +217,9 @@ def main() -> None:
         training_kwargs["evaluation_strategy"] = "epoch"
     training_args = TrainingArguments(**training_kwargs)
 
+    class_weights = make_class_weights(train_encodings["labels"], len(labels), args.class_weight, torch)
+    trainer_class = make_weighted_trainer(Trainer, class_weights, torch) if class_weights is not None else Trainer
+
     trainer_kwargs = {
         "model": model,
         "args": training_args,
@@ -189,7 +234,7 @@ def main() -> None:
     elif "tokenizer" in trainer_signature.parameters:
         trainer_kwargs["tokenizer"] = tokenizer
 
-    trainer = Trainer(**trainer_kwargs)
+    trainer = trainer_class(**trainer_kwargs)
     trainer.train()
     metrics = trainer.evaluate()
     trainer.save_model(args.output_dir)
@@ -197,7 +242,18 @@ def main() -> None:
 
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     with open(Path(args.output_dir) / "labels.json", "w", encoding="utf-8") as f:
-        json.dump({"labels": labels, "label2id": label2id, "id2label": id2label}, f, ensure_ascii=False, indent=2)
+        json.dump(
+            {
+                "labels": labels,
+                "label2id": label2id,
+                "id2label": id2label,
+                "tag_scheme": args.tag_scheme,
+                "class_weight": args.class_weight,
+            },
+            f,
+            ensure_ascii=False,
+            indent=2,
+        )
     with open(Path(args.output_dir) / "eval_metrics.json", "w", encoding="utf-8") as f:
         json.dump(metrics, f, ensure_ascii=False, indent=2)
 

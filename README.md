@@ -56,12 +56,14 @@ Evaluate predictions:
 py -3.14 -m src.absa.evaluate --gold data/dev.jsonl --pred outputs/keyword_dev_predictions.jsonl
 ```
 
-Post-process transformer predictions before final evaluation:
+Optional post-processing ablation:
 
 ```powershell
 py -3.14 -m src.absa.postprocess_predictions --input outputs/xlmr_dev_predictions.jsonl --output outputs/xlmr_dev_predictions_pp.jsonl --min-span-chars 6 --merge-gap 30
 py -3.14 -m src.absa.evaluate --gold data/dev.jsonl --pred outputs/xlmr_dev_predictions_pp.jsonl --json-output outputs/xlmr_dev_metrics_pp.json
 ```
+
+This heuristic post-processing should not be treated as the main score. Use it only as an ablation/error-analysis result and disclose the rule and dev-tuned parameters.
 
 Fine-tune a transformer, preferably on Colab/Kaggle GPU:
 
@@ -70,6 +72,42 @@ python -m src.absa.train_transformer \
   --model-name FacebookAI/xlm-roberta-base \
   --data-dir data \
   --output-dir outputs/xlmr-absa \
+  --tag-scheme bio \
+  --class-weight none \
+  --epochs 5 \
+  --batch-size 8
+```
+
+Clean follow-up experiments:
+
+```bash
+# Better boundary modeling than BIO.
+python -m src.absa.train_transformer \
+  --model-name FacebookAI/xlm-roberta-base \
+  --data-dir data \
+  --output-dir outputs/xlmr-bilou \
+  --tag-scheme bilou \
+  --class-weight none \
+  --epochs 5 \
+  --batch-size 8
+
+# Handle label imbalance using train-set-derived weights.
+python -m src.absa.train_transformer \
+  --model-name FacebookAI/xlm-roberta-base \
+  --data-dir data \
+  --output-dir outputs/xlmr-bio-weighted \
+  --tag-scheme bio \
+  --class-weight sqrt-balanced \
+  --epochs 5 \
+  --batch-size 8
+
+# Combine both clean improvements.
+python -m src.absa.train_transformer \
+  --model-name FacebookAI/xlm-roberta-base \
+  --data-dir data \
+  --output-dir outputs/xlmr-bilou-weighted \
+  --tag-scheme bilou \
+  --class-weight sqrt-balanced \
   --epochs 5 \
   --batch-size 8
 ```
@@ -85,7 +123,7 @@ python -m src.absa.train_transformer --model-name vinai/phobert-base-v2 --data-d
 - Dataset description: split sizes, aspect distribution, sentiment distribution.
 - Task formulation: span extraction plus aspect-polarity classification.
 - Preprocessing: offset validation, BIO conversion, tokenizer alignment.
-- Post-processing: merge nearby same-label fragments and filter very short spans.
+- Optional post-processing ablation: merge nearby same-label fragments and filter very short spans, reported separately from the main score.
 - Baseline: keyword baseline or CRF/BiLSTM if added later.
 - Main model: XLM-R or PhoBERT token classification.
 - Evaluation: exact span + label micro precision, recall, F1.

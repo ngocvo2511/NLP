@@ -41,11 +41,19 @@ def tags_to_spans(tags: list[str], offsets: list[tuple[int, int]]) -> list[SpanL
             close_current()
             continue
         prefix, label = tag.split("-", 1)
-        if prefix == "B" or label != current_label:
+        if prefix == "U":
+            close_current()
+            spans.append(SpanLabel(start, end, label))
+        elif prefix == "B" or label != current_label:
             close_current()
             current_label = label
             current_start = start
             current_end = end
+            if prefix == "L":
+                close_current()
+        elif prefix == "L":
+            current_end = end
+            close_current()
         else:
             current_end = end
     close_current()
