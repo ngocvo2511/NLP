@@ -4,6 +4,7 @@ from src.absa.data import Example, SpanLabel
 from src.absa.metrics import evaluate_exact
 from src.absa.postprocess import postprocess_spans
 from src.absa.tags import bio_to_spans, spans_to_bio, spans_to_tags, tags_to_spans
+from src.absa.train_transformer import ids_to_spans
 
 
 class AbsaCoreTests(unittest.TestCase):
@@ -60,6 +61,20 @@ class AbsaCoreTests(unittest.TestCase):
         result = postprocess_spans(spans, "pin x trau y c", min_chars=4, merge_gap=2)
 
         self.assertEqual(result, [SpanLabel(0, 10, "BATTERY#POSITIVE")])
+
+    def test_ids_to_spans_supports_bilou_tags(self):
+        id2label = {
+            0: "O",
+            1: "B-BATTERY#POSITIVE",
+            2: "L-BATTERY#POSITIVE",
+            3: "U-CAMERA#NEGATIVE",
+        }
+        pred_ids = [1, 2, 0, 3]
+        offsets = [(0, 3), (4, 8), (9, 12), (13, 19)]
+
+        result = ids_to_spans(pred_ids, offsets, id2label)
+
+        self.assertEqual(result, {(0, 8, "BATTERY#POSITIVE"), (13, 19, "CAMERA#NEGATIVE")})
 
 
 if __name__ == "__main__":

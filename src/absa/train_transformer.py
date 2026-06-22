@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from .data import read_jsonl
+from .metrics import prf
 from .tags import build_sequence_labels, tag_prefix
 
 
@@ -78,6 +79,17 @@ def encode_examples(examples, tokenizer, label2id: dict[str, int], max_length: i
     return tokenized
 
 
+def encode_offsets(examples, tokenizer, max_length: int) -> list[list[tuple[int, int]]]:
+    tokenized = tokenizer(
+        [ex.text for ex in examples],
+        truncation=True,
+        max_length=max_length,
+        padding=False,
+        return_offsets_mapping=True,
+    )
+    return [[tuple(offset) for offset in row] for row in tokenized["offset_mapping"]]
+
+
 def make_class_weights(label_rows: list[list[int]], num_labels: int, mode: str, torch):
     if mode == "none":
         return None
@@ -115,34 +127,100 @@ def make_weighted_trainer(base_trainer, class_weights, torch):
     return WeightedTokenClassificationTrainer
 
 
-def compute_token_metrics(eval_pred, o_label_id: int) -> dict[str, float]:
-    logits, labels = eval_pred
-    predictions = np.argmax(logits, axis=-1)
+def ids_to_spans(pred_ids: np.ndarray, offsets: list[tuple[int, int]], id2label: dict[int, str]) -> set[tuple[int, int, str]]:
+    spans: set[tuple[int, int, str]] = set()
+    current_label: str | None = None
+    current_start: int | None = None
+    current_end: int | None = None
 
-    tp = fp = fn = correct = total = 0
-    for pred_row, label_row in zip(predictions, labels):
-        for pred_id, gold_id in zip(pred_row, label_row):
-            if gold_id == -100:
-                continue
-            total += 1
-            if pred_id == gold_id:
-                correct += 1
-            if pred_id != o_label_id and gold_id != o_label_id and pred_id == gold_id:
-                tp += 1
-            elif pred_id != o_label_id and pred_id != gold_id:
-                fp += 1
-            elif gold_id != o_label_id and pred_id != gold_id:
-                fn += 1
+    def close_current() -> None:
+        nonlocal current_label, current_start, current_end
+        if current_label is not None and current_start is not None and current_end is not None:
+            spans.add((current_start, current_end, current_label))
+        current_label = None
+        current_start = None
+        current_end = None
 
-    precision = tp / (tp + fp) if tp + fp else 0.0
-    recall = tp / (tp + fn) if tp + fn else 0.0
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
-    return {
-        "token_accuracy": correct / total if total else 0.0,
-        "token_non_o_precision": precision,
-        "token_non_o_recall": recall,
-        "token_non_o_f1": f1,
-    }
+    for pred_id, (start, end) in zip(pred_ids[: len(offsets)], offsets):
+        if start == 0 and end == 0:
+            continue
+        tag = id2label[int(pred_id)]
+        if tag == "O" or "-" not in tag:
+            close_current()
+            continue
+
+        prefix, label = tag.split("-", 1)
+        if prefix == "U":
+            close_current()
+            spans.add((start, end, label))
+        elif prefix == "B" or label != current_label:
+            close_current()
+            current_label = label
+            current_start = start
+            current_end = end
+            if prefix == "L":
+                close_current()
+        elif prefix == "L":
+            current_end = end
+            close_current()
+        else:
+            current_end = end
+
+    close_current()
+    return spans
+
+
+def make_compute_metrics(dev_examples, dev_offsets, id2label: dict[int, str], o_label_id: int):
+    gold_sets = []
+    for ex in dev_examples:
+        gold_sets.append(
+            {
+                (span.clamped(ex.text).start, span.clamped(ex.text).end, span.label)
+                for span in ex.labels
+                if span.clamped(ex.text).start < span.clamped(ex.text).end
+            }
+        )
+
+    def compute_metrics(eval_pred) -> dict[str, float]:
+        logits, labels = eval_pred
+        predictions = np.argmax(logits, axis=-1)
+
+        token_tp = token_fp = token_fn = correct = total = 0
+        span_tp = span_fp = span_fn = 0
+
+        for row_idx, (pred_row, label_row) in enumerate(zip(predictions, labels)):
+            for pred_id, gold_id in zip(pred_row, label_row):
+                if gold_id == -100:
+                    continue
+                total += 1
+                if pred_id == gold_id:
+                    correct += 1
+                if pred_id != o_label_id and gold_id != o_label_id and pred_id == gold_id:
+                    token_tp += 1
+                elif pred_id != o_label_id and pred_id != gold_id:
+                    token_fp += 1
+                elif gold_id != o_label_id and pred_id != gold_id:
+                    token_fn += 1
+
+            pred_spans = ids_to_spans(pred_row, dev_offsets[row_idx], id2label)
+            gold_spans = gold_sets[row_idx]
+            span_tp += len(pred_spans & gold_spans)
+            span_fp += len(pred_spans - gold_spans)
+            span_fn += len(gold_spans - pred_spans)
+
+        token_scores = prf(token_tp, token_fp, token_fn)
+        span_scores = prf(span_tp, span_fp, span_fn)
+        return {
+            "token_accuracy": correct / total if total else 0.0,
+            "token_non_o_precision": token_scores["precision"],
+            "token_non_o_recall": token_scores["recall"],
+            "token_non_o_f1": token_scores["f1"],
+            "exact_span_precision": span_scores["precision"],
+            "exact_span_recall": span_scores["recall"],
+            "exact_span_f1": span_scores["f1"],
+        }
+
+    return compute_metrics
 
 
 def main() -> None:
@@ -154,9 +232,15 @@ def main() -> None:
     parser.add_argument("--epochs", type=float, default=5)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--learning-rate", type=float, default=2e-5)
+    parser.add_argument("--gradient-accumulation-steps", type=int, default=1)
+    parser.add_argument("--warmup-ratio", type=float, default=0.0)
+    parser.add_argument("--weight-decay", type=float, default=0.01)
+    parser.add_argument("--save-total-limit", type=int, default=2)
+    parser.add_argument("--fp16", action="store_true")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--tag-scheme", default="bio", choices=["bio", "bilou"])
     parser.add_argument("--class-weight", default="none", choices=["none", "balanced", "sqrt-balanced"])
+    parser.add_argument("--metric-for-best-model", default="exact_span_f1")
     args = parser.parse_args()
 
     (
@@ -184,6 +268,7 @@ def main() -> None:
 
     train_encodings = encode_examples(train_examples, tokenizer, label2id, args.max_length, args.tag_scheme)
     dev_encodings = encode_examples(dev_examples, tokenizer, label2id, args.max_length, args.tag_scheme)
+    dev_offsets = encode_offsets(dev_examples, tokenizer, args.max_length)
     train_dataset = AbsDataset(train_encodings)
     dev_dataset = AbsDataset(dev_encodings)
 
@@ -200,15 +285,19 @@ def main() -> None:
         "learning_rate": args.learning_rate,
         "per_device_train_batch_size": args.batch_size,
         "per_device_eval_batch_size": args.batch_size,
+        "gradient_accumulation_steps": args.gradient_accumulation_steps,
         "num_train_epochs": args.epochs,
-        "weight_decay": 0.01,
+        "warmup_ratio": args.warmup_ratio,
+        "weight_decay": args.weight_decay,
         "save_strategy": "epoch",
+        "save_total_limit": args.save_total_limit,
         "load_best_model_at_end": True,
-        "metric_for_best_model": "token_non_o_f1",
+        "metric_for_best_model": args.metric_for_best_model,
         "greater_is_better": True,
         "logging_steps": 50,
         "report_to": "none",
         "seed": args.seed,
+        "fp16": args.fp16,
     }
     args_signature = inspect.signature(TrainingArguments.__init__)
     if "eval_strategy" in args_signature.parameters:
@@ -226,7 +315,7 @@ def main() -> None:
         "train_dataset": train_dataset,
         "eval_dataset": dev_dataset,
         "data_collator": data_collator,
-        "compute_metrics": lambda pred: compute_token_metrics(pred, label2id["O"]),
+        "compute_metrics": make_compute_metrics(dev_examples, dev_offsets, id2label, label2id["O"]),
     }
     trainer_signature = inspect.signature(Trainer.__init__)
     if "processing_class" in trainer_signature.parameters:
