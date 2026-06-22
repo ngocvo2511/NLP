@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .data import read_jsonl
+from .data import iter_token_spans, read_jsonl
 from .metrics import prf
 from .tags import build_sequence_labels, tag_prefix
 
@@ -41,7 +41,37 @@ class AbsDataset:
         return {key: value[idx] for key, value in self.encodings.items()}
 
 
-def encode_examples(examples, tokenizer, label2id: dict[str, int], max_length: int, tag_scheme: str) -> dict:
+def resolve_alignment_mode(tokenizer, requested: str) -> str:
+    if requested == "auto":
+        return "offset" if getattr(tokenizer, "is_fast", False) else "word"
+    if requested == "offset" and not getattr(tokenizer, "is_fast", False):
+        raise SystemExit(f"{tokenizer.name_or_path} does not provide a fast tokenizer with offset mappings.")
+    return requested
+
+
+def label_for_subtokens(
+    text: str,
+    token_offsets: list[tuple[int, int]],
+    spans,
+    label2id: dict[str, int],
+    tag_scheme: str,
+) -> list[int]:
+    labels = [-100] * len(token_offsets)
+    for span in [label.clamped(text) for label in spans]:
+        if span.start >= span.end:
+            continue
+        covered = [
+            i
+            for i, (start, end) in enumerate(token_offsets)
+            if not (start == 0 and end == 0) and start < span.end and end > span.start
+        ]
+        for pos, token_idx in enumerate(covered):
+            prefix = tag_prefix(pos, len(covered), tag_scheme)
+            labels[token_idx] = label2id[f"{prefix}-{span.label}"]
+    return labels
+
+
+def encode_with_offsets(examples, tokenizer, label2id: dict[str, int], max_length: int, tag_scheme: str) -> tuple[dict, list[list[tuple[int, int]]]]:
     texts = [ex.text for ex in examples]
     tokenized = tokenizer(
         texts,
@@ -52,42 +82,81 @@ def encode_examples(examples, tokenizer, label2id: dict[str, int], max_length: i
     )
 
     all_labels = []
+    all_offsets = []
     for row_idx, ex in enumerate(examples):
-        offsets = tokenized["offset_mapping"][row_idx]
-        labels = [-100] * len(offsets)
-
-        for span in [label.clamped(ex.text) for label in ex.labels]:
-            if span.start >= span.end:
-                continue
-            covered = [
-                i
-                for i, (start, end) in enumerate(offsets)
-                if not (start == 0 and end == 0) and start < span.end and end > span.start
-            ]
-            for pos, token_idx in enumerate(covered):
-                prefix = tag_prefix(pos, len(covered), tag_scheme)
-                labels[token_idx] = label2id[f"{prefix}-{span.label}"]
+        offsets = [tuple(offset) for offset in tokenized["offset_mapping"][row_idx]]
+        labels = label_for_subtokens(ex.text, offsets, ex.labels, label2id, tag_scheme)
 
         for i, (start, end) in enumerate(offsets):
             if labels[i] == -100:
                 labels[i] = -100 if start == 0 and end == 0 else label2id["O"]
 
         all_labels.append(labels)
+        all_offsets.append(offsets)
 
     tokenized.pop("offset_mapping")
     tokenized["labels"] = all_labels
-    return tokenized
+    return tokenized, all_offsets
 
 
-def encode_offsets(examples, tokenizer, max_length: int) -> list[list[tuple[int, int]]]:
-    tokenized = tokenizer(
-        [ex.text for ex in examples],
-        truncation=True,
-        max_length=max_length,
-        padding=False,
-        return_offsets_mapping=True,
-    )
-    return [[tuple(offset) for offset in row] for row in tokenized["offset_mapping"]]
+def encode_with_word_alignment(examples, tokenizer, label2id: dict[str, int], max_length: int, tag_scheme: str) -> tuple[dict, list[list[tuple[int, int]]]]:
+    input_ids = []
+    attention_mask = []
+    all_labels = []
+    all_offsets = []
+    max_content_length = max_length - tokenizer.num_special_tokens_to_add(pair=False)
+
+    for ex in examples:
+        pieces = []
+        piece_offsets = []
+        for start, end, token in iter_token_spans(ex.text):
+            subtokens = tokenizer.tokenize(token)
+            if not subtokens:
+                subtokens = [tokenizer.unk_token]
+            pieces.extend(subtokens)
+            piece_offsets.extend((start, end) for _ in subtokens)
+
+        pieces = pieces[:max_content_length]
+        piece_offsets = piece_offsets[:max_content_length]
+        piece_ids = tokenizer.convert_tokens_to_ids(pieces)
+        special_mask = tokenizer.get_special_tokens_mask(piece_ids, already_has_special_tokens=False)
+        row_input_ids = tokenizer.build_inputs_with_special_tokens(piece_ids)
+
+        row_offsets = []
+        piece_idx = 0
+        for is_special in special_mask:
+            if is_special:
+                row_offsets.append((0, 0))
+            else:
+                row_offsets.append(piece_offsets[piece_idx])
+                piece_idx += 1
+
+        row_labels = label_for_subtokens(ex.text, row_offsets, ex.labels, label2id, tag_scheme)
+        for i, (start, end) in enumerate(row_offsets):
+            if row_labels[i] == -100:
+                row_labels[i] = -100 if start == 0 and end == 0 else label2id["O"]
+
+        input_ids.append(row_input_ids)
+        attention_mask.append([1] * len(row_input_ids))
+        all_labels.append(row_labels)
+        all_offsets.append(row_offsets)
+
+    return {"input_ids": input_ids, "attention_mask": attention_mask, "labels": all_labels}, all_offsets
+
+
+def encode_examples(
+    examples,
+    tokenizer,
+    label2id: dict[str, int],
+    max_length: int,
+    tag_scheme: str,
+    alignment_mode: str,
+) -> tuple[dict, list[list[tuple[int, int]]]]:
+    if alignment_mode == "offset":
+        return encode_with_offsets(examples, tokenizer, label2id, max_length, tag_scheme)
+    if alignment_mode == "word":
+        return encode_with_word_alignment(examples, tokenizer, label2id, max_length, tag_scheme)
+    raise ValueError(f"Unsupported tokenizer alignment mode: {alignment_mode}")
 
 
 def make_class_weights(label_rows: list[list[int]], num_labels: int, mode: str, torch):
@@ -241,6 +310,7 @@ def main() -> None:
     parser.add_argument("--tag-scheme", default="bio", choices=["bio", "bilou"])
     parser.add_argument("--class-weight", default="none", choices=["none", "balanced", "sqrt-balanced"])
     parser.add_argument("--metric-for-best-model", default="exact_span_f1")
+    parser.add_argument("--tokenizer-alignment", default="auto", choices=["auto", "offset", "word"])
     args = parser.parse_args()
 
     (
@@ -262,13 +332,12 @@ def main() -> None:
     label2id = {label: i for i, label in enumerate(labels)}
     id2label = {i: label for label, i in label2id.items()}
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
-    if not tokenizer.is_fast:
-        raise SystemExit(f"{args.model_name} does not provide a fast tokenizer with offset mappings.")
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=args.tokenizer_alignment != "word")
+    alignment_mode = resolve_alignment_mode(tokenizer, args.tokenizer_alignment)
+    print(f"Using tokenizer alignment mode: {alignment_mode}")
 
-    train_encodings = encode_examples(train_examples, tokenizer, label2id, args.max_length, args.tag_scheme)
-    dev_encodings = encode_examples(dev_examples, tokenizer, label2id, args.max_length, args.tag_scheme)
-    dev_offsets = encode_offsets(dev_examples, tokenizer, args.max_length)
+    train_encodings, _ = encode_examples(train_examples, tokenizer, label2id, args.max_length, args.tag_scheme, alignment_mode)
+    dev_encodings, dev_offsets = encode_examples(dev_examples, tokenizer, label2id, args.max_length, args.tag_scheme, alignment_mode)
     train_dataset = AbsDataset(train_encodings)
     dev_dataset = AbsDataset(dev_encodings)
 
@@ -338,6 +407,7 @@ def main() -> None:
                 "id2label": id2label,
                 "tag_scheme": args.tag_scheme,
                 "class_weight": args.class_weight,
+                "tokenizer_alignment": alignment_mode,
             },
             f,
             ensure_ascii=False,

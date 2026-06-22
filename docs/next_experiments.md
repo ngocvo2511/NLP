@@ -26,6 +26,11 @@ Run these in `notebooks/model_sweep_colab_drive.ipynb`, one section at a time:
    - Larger capacity model.
    - Run only if GPU memory allows it.
 
+5. `vinai/phobert-base-v2`
+   - Vietnamese-specific model.
+   - Use `--tokenizer-alignment word` because the standard PhoBERT tokenizer is slow and does not provide fast offset mappings.
+   - This keeps original character offsets, but it is not yet a full VnCoreNLP word-segmented PhoBERT setup.
+
 ## Preprocessing Position
 
 Do not normalize, remove accents, word-segment, or rewrite raw text unless an offset mapping back to the original text is implemented. This dataset is span-based, so destructive preprocessing can invalidate `start` and `end` labels.
@@ -37,4 +42,4 @@ Clean preprocessing that is currently allowed:
 - tokenizer alignment through fast tokenizer offset mappings,
 - report noisy-text issues in error analysis.
 
-PhoBERT is not the first clean target because its model card recommends word-segmented input. Word segmentation changes character offsets, so it needs a separate alignment layer before being used fairly for exact span prediction.
+PhoBERT's model card recommends word-segmented input and notes that standard Transformers includes a slow tokenizer. The current PhoBERT trial uses regex word alignment to preserve original offsets. A stricter future version can add VnCoreNLP word segmentation plus an explicit mapping back to original character offsets.

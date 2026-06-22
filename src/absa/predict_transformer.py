@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import numpy as np
 
-from .data import SpanLabel, read_jsonl, write_jsonl
+from .data import SpanLabel, iter_token_spans, read_jsonl, write_jsonl
 from .postprocess import postprocess_spans
 
 
@@ -60,6 +61,55 @@ def tags_to_spans(tags: list[str], offsets: list[tuple[int, int]]) -> list[SpanL
     return spans
 
 
+def resolve_alignment_mode(model_dir: str, tokenizer) -> str:
+    labels_path = Path(model_dir) / "labels.json"
+    if labels_path.exists():
+        with labels_path.open("r", encoding="utf-8") as f:
+            labels_meta = json.load(f)
+        mode = labels_meta.get("tokenizer_alignment")
+        if mode:
+            return mode
+    return "offset" if getattr(tokenizer, "is_fast", False) else "word"
+
+
+def encode_word_aligned_batch(texts: list[str], tokenizer, max_length: int):
+    input_ids = []
+    attention_mask = []
+    offsets = []
+    max_content_length = max_length - tokenizer.num_special_tokens_to_add(pair=False)
+
+    for text in texts:
+        pieces = []
+        piece_offsets = []
+        for start, end, token in iter_token_spans(text):
+            subtokens = tokenizer.tokenize(token)
+            if not subtokens:
+                subtokens = [tokenizer.unk_token]
+            pieces.extend(subtokens)
+            piece_offsets.extend((start, end) for _ in subtokens)
+
+        pieces = pieces[:max_content_length]
+        piece_offsets = piece_offsets[:max_content_length]
+        piece_ids = tokenizer.convert_tokens_to_ids(pieces)
+        special_mask = tokenizer.get_special_tokens_mask(piece_ids, already_has_special_tokens=False)
+        row_input_ids = tokenizer.build_inputs_with_special_tokens(piece_ids)
+
+        row_offsets = []
+        piece_idx = 0
+        for is_special in special_mask:
+            if is_special:
+                row_offsets.append((0, 0))
+            else:
+                row_offsets.append(piece_offsets[piece_idx])
+                piece_idx += 1
+
+        input_ids.append(row_input_ids)
+        attention_mask.append([1] * len(row_input_ids))
+        offsets.append(row_offsets)
+
+    return {"input_ids": input_ids, "attention_mask": attention_mask}, offsets
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Predict span-level ABSA labels with a fine-tuned transformer.")
     parser.add_argument("--model-dir", required=True)
@@ -74,6 +124,7 @@ def main() -> None:
     torch, AutoModelForTokenClassification, AutoTokenizer = require_deps()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     tokenizer = AutoTokenizer.from_pretrained(args.model_dir, use_fast=True)
+    alignment_mode = resolve_alignment_mode(args.model_dir, tokenizer)
     model = AutoModelForTokenClassification.from_pretrained(args.model_dir).to(device)
     model.eval()
 
@@ -82,15 +133,19 @@ def main() -> None:
     for start in range(0, len(examples), args.batch_size):
         batch = examples[start : start + args.batch_size]
         texts = [ex.text for ex in batch]
-        encoded = tokenizer(
-            texts,
-            truncation=True,
-            max_length=args.max_length,
-            padding=True,
-            return_offsets_mapping=True,
-            return_tensors="pt",
-        )
-        offsets = encoded.pop("offset_mapping").cpu().numpy().tolist()
+        if alignment_mode == "word":
+            encoded, offsets = encode_word_aligned_batch(texts, tokenizer, args.max_length)
+            encoded = tokenizer.pad(encoded, padding=True, return_tensors="pt")
+        else:
+            encoded = tokenizer(
+                texts,
+                truncation=True,
+                max_length=args.max_length,
+                padding=True,
+                return_offsets_mapping=True,
+                return_tensors="pt",
+            )
+            offsets = encoded.pop("offset_mapping").cpu().numpy().tolist()
         encoded = {key: value.to(device) for key, value in encoded.items()}
         with torch.no_grad():
             logits = model(**encoded).logits.cpu().numpy()

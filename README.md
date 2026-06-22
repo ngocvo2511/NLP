@@ -119,8 +119,17 @@ python -m src.absa.train_transformer \
 For Vietnamese-only experiments, also try:
 
 ```bash
-python -m src.absa.train_transformer --model-name vinai/phobert-base-v2 --data-dir data --output-dir outputs/phobert-absa
+python -m src.absa.train_transformer \
+  --model-name vinai/phobert-base-v2 \
+  --data-dir data \
+  --output-dir outputs/phobert-base-v2-bio-wordalign \
+  --tokenizer-alignment word \
+  --tag-scheme bio \
+  --epochs 6 \
+  --batch-size 8
 ```
+
+PhoBERT's standard tokenizer is slow and does not provide fast offset mappings in mainline Transformers, so this project uses word-level alignment to preserve original character offsets for span evaluation.
 
 ## Report Structure
 
