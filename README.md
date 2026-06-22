@@ -67,6 +67,8 @@ This heuristic post-processing should not be treated as the main score. Use it o
 
 Fine-tune a transformer, preferably on Colab/Kaggle GPU:
 
+For Colab, prefer `notebooks/train_colab_drive.ipynb`. It saves checkpoints, predictions, and metrics to Google Drive under `MyDrive/NLP_outputs`, so outputs survive runtime disconnects.
+
 ```bash
 python -m src.absa.train_transformer \
   --model-name FacebookAI/xlm-roberta-base \
