@@ -131,6 +131,29 @@ python -m src.absa.train_transformer \
 
 PhoBERT's standard tokenizer is slow and does not provide fast offset mappings in mainline Transformers, so this project uses word-level alignment to preserve original character offsets for span evaluation.
 
+CRF experiments:
+
+```bash
+# Token embedding + character CNN + BiLSTM + CRF.
+python -m src.absa.train_bilstm_crf \
+  --data-dir data \
+  --output-dir outputs/bilstm-crf \
+  --batch-tokens 5000 \
+  --epochs 30 \
+  --word-dim 300 \
+  --hidden-size 512 \
+  --dropout 0.5
+
+# PhoBERT contextual embeddings + character CNN + BiLSTM + CRF.
+python -m src.absa.train_transformer_bilstm_crf \
+  --model-name vinai/phobert-base-v2 \
+  --data-dir data \
+  --output-dir outputs/phobert-bilstm-crf \
+  --epochs 12 \
+  --batch-size 8 \
+  --hidden-size 512
+```
+
 ## Report Structure
 
 - Dataset description: split sizes, aspect distribution, sentiment distribution.

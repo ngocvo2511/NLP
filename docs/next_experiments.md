@@ -2,6 +2,25 @@
 
 The current best clean dev result is `XLM-R BIO raw` with exact span + label F1 around `0.4710`.
 
+## CRF Direction
+
+Two CRF models are now available:
+
+1. `src.absa.train_bilstm_crf`
+   - token/syllable embedding,
+   - character CNN embedding,
+   - BiLSTM,
+   - CRF decoding,
+   - token-budget batches such as `--batch-tokens 5000`,
+   - intended for longer runs around 30 epochs.
+
+2. `src.absa.train_transformer_bilstm_crf`
+   - PhoBERT/XLM-R contextual embeddings,
+   - character CNN embedding,
+   - BiLSTM,
+   - CRF decoding,
+   - heavier, so start around 10-12 epochs and increase if dev F1 is still rising.
+
 ## Why Change The Training Metric
 
 Earlier runs selected the best checkpoint using token-level F1. That is not the project metric. The training script now reports and selects by `exact_span_f1`, which is closer to the final ABSA evaluation.
