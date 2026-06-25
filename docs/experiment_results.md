@@ -6,7 +6,9 @@ All scores below are exact span + label micro scores on `data/dev.jsonl`.
 
 | Experiment | Precision | Recall | F1 | Notes |
 |---|---:|---:|---:|---|
-| XLM-R BIO raw | 0.4097 | 0.5539 | 0.4710 | Best clean score so far from downloaded outputs. |
+| PhoBERT + BiLSTM-CRF | 0.5943 | 0.5966 | 0.5954 | Best clean score so far; CRF substantially improves boundary/label consistency. |
+| BiLSTM-CRF | 0.5642 | 0.5374 | 0.5505 | Strong non-transformer CRF baseline; beats all token-classification transformer runs. |
+| XLM-R BIO raw | 0.4097 | 0.5539 | 0.4710 | Best plain transformer token-classification run. |
 | PhoBERT base v2 BIO word-aligned | 0.4215 | 0.5243 | 0.4673 | Very close to XLM-R BIO; higher precision, lower recall. |
 | XLM-R BIO raw, exact-span checkpoint selection | 0.3950 | 0.5394 | 0.4560 | Did not beat the earlier BIO run. |
 | XLM-R BILOU raw | 0.3951 | 0.5503 | 0.4600 | Cleaner boundary scheme, but did not beat BIO. |
@@ -18,14 +20,14 @@ All scores below are exact span + label micro scores on `data/dev.jsonl`.
 
 ## Interpretation
 
-PhoBERT base v2 with word alignment is competitive with XLM-R BIO but does not beat it overall. It improves precision and performs well on aspects such as `DESIGN`, `BATTERY`, and `SER&ACC`, but recall is lower and `NEUTRAL` remains almost unsolved. BILOU is valid, but this run did not improve exact span F1. Weighted loss increased recall, especially for neutral and rare classes, but precision collapsed because the model over-predicted spans. mBERT and XLM-R large were also below the earlier XLM-R BIO result. mDeBERTa-v3 failed repeatedly: it produced no predicted spans and had zero non-`O` token F1 during evaluation, so it should be treated as an incompatible/failed run rather than a competitive model.
+The CRF direction is clearly the strongest so far. Plain BiLSTM-CRF reaches `0.5505` F1, and PhoBERT + BiLSTM-CRF reaches `0.5954` F1 without heuristic post-processing. CRF decoding reduces false positives compared with plain token classification and significantly improves `NEGATIVE` and `NEUTRAL` polarities. PhoBERT base v2 with word alignment is competitive with XLM-R BIO but does not beat it overall as a plain token classifier. BILOU is valid, but this run did not improve exact span F1. Weighted loss increased recall, especially for neutral and rare classes, but precision collapsed because the model over-predicted spans. mBERT and XLM-R large were also below the earlier XLM-R BIO result. mDeBERTa-v3 failed repeatedly: it produced no predicted spans and had zero non-`O` token F1 during evaluation, so it should be treated as an incompatible/failed run rather than a competitive model.
 
-The current main clean result should remain `XLM-R BIO raw` unless a later clean experiment beats it.
+The current main clean result should be `PhoBERT + BiLSTM-CRF`.
 
 The next clean direction should avoid dev-tuned output heuristics and instead improve the training objective or model structure, for example:
 
-- tune learning rate and epoch count for BIO raw,
-- tune `vinai/phobert-base-v2` with a smaller learning rate or more epochs because it is close to XLM-R,
-- try focal loss instead of balanced cross entropy,
-- add a CRF layer or span-classification formulation,
-- add confidence-threshold decoding only if the threshold is selected on dev and reported transparently.
+- continue tuning `PhoBERT + BiLSTM-CRF` because it is now close to the target `0.6+` range,
+- try 20-30 epochs if dev F1 is still rising,
+- try `hidden-size 768`, `dropout 0.4`, or `head-learning-rate 5e-4`,
+- run 2-3 seeds for the final CRF configuration,
+- keep heuristic post-processing only as an ablation, not as the main score.
