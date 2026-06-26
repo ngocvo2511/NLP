@@ -38,17 +38,26 @@ def spans_to_tags(
     scheme: str = "bio",
 ) -> tuple[list[str], list[tuple[int, int, str]]]:
     tokens = iter_token_spans(example.text)
-    tags = ["O"] * len(tokens)
+    return spans_to_tags_with_offsets(example, tokens, clamp_offsets=clamp_offsets, scheme=scheme)
+
+
+def spans_to_tags_with_offsets(
+    example: Example,
+    offsets: list[tuple[int, int, str]],
+    clamp_offsets: bool = True,
+    scheme: str = "bio",
+) -> tuple[list[str], list[tuple[int, int, str]]]:
+    tags = ["O"] * len(offsets)
     spans = [label.clamped(example.text) if clamp_offsets else label for label in example.labels]
 
     for span in spans:
         if span.start >= span.end:
             continue
-        covered = [i for i, (start, end, _) in enumerate(tokens) if start < span.end and end > span.start]
+        covered = [i for i, (start, end, _) in enumerate(offsets) if start < span.end and end > span.start]
         for pos, token_idx in enumerate(covered):
             prefix = tag_prefix(pos, len(covered), scheme)
             tags[token_idx] = f"{prefix}-{span.label}"
-    return tags, tokens
+    return tags, offsets
 
 
 def spans_to_bio(example: Example, clamp_offsets: bool = True) -> tuple[list[str], list[tuple[int, int, str]]]:

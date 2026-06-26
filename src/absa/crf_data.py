@@ -7,7 +7,7 @@ from typing import Iterable
 import torch
 
 from .data import Example, iter_token_spans
-from .tags import spans_to_tags, tags_to_spans
+from .tags import spans_to_tags, spans_to_tags_with_offsets, tags_to_spans
 
 
 PAD = "<pad>"
@@ -22,10 +22,23 @@ class SequenceInstance:
     tag_ids: list[int]
 
 
-def build_vocab(examples: Iterable[Example], min_freq: int = 1, lowercase: bool = True) -> dict[str, int]:
+def iter_unit_spans(text: str, unit: str = "token") -> list[tuple[int, int, str]]:
+    if unit == "token":
+        return iter_token_spans(text)
+    if unit == "char":
+        return [(idx, idx + 1, char) for idx, char in enumerate(text)]
+    raise ValueError(f"Unsupported sequence unit: {unit}")
+
+
+def build_vocab(
+    examples: Iterable[Example],
+    min_freq: int = 1,
+    lowercase: bool = True,
+    unit: str = "token",
+) -> dict[str, int]:
     counts: Counter[str] = Counter()
     for ex in examples:
-        for _, _, token in iter_token_spans(ex.text):
+        for _, _, token in iter_unit_spans(ex.text, unit=unit):
             counts[token.lower() if lowercase else token] += 1
     vocab = {PAD: 0, UNK: 1}
     for token, count in counts.most_common():
@@ -34,10 +47,10 @@ def build_vocab(examples: Iterable[Example], min_freq: int = 1, lowercase: bool 
     return vocab
 
 
-def build_char_vocab(examples: Iterable[Example], min_freq: int = 1) -> dict[str, int]:
+def build_char_vocab(examples: Iterable[Example], min_freq: int = 1, unit: str = "token") -> dict[str, int]:
     counts: Counter[str] = Counter()
     for ex in examples:
-        for _, _, token in iter_token_spans(ex.text):
+        for _, _, token in iter_unit_spans(ex.text, unit=unit):
             counts.update(token)
     vocab = {PAD: 0, UNK: 1}
     for char, count in counts.most_common():
@@ -46,10 +59,19 @@ def build_char_vocab(examples: Iterable[Example], min_freq: int = 1) -> dict[str
     return vocab
 
 
-def make_instances(examples: Iterable[Example], label2id: dict[str, int], scheme: str) -> list[SequenceInstance]:
+def make_instances(
+    examples: Iterable[Example],
+    label2id: dict[str, int],
+    scheme: str,
+    unit: str = "token",
+) -> list[SequenceInstance]:
     instances = []
     for ex in examples:
-        tags, offsets = spans_to_tags(ex, scheme=scheme)
+        if unit == "token":
+            tags, offsets = spans_to_tags(ex, scheme=scheme)
+        else:
+            offsets = iter_unit_spans(ex.text, unit=unit)
+            tags, offsets = spans_to_tags_with_offsets(ex, offsets, scheme=scheme)
         tokens = [token for _, _, token in offsets]
         instances.append(SequenceInstance(ex.text, tokens, offsets, [label2id[tag] for tag in tags]))
     return instances

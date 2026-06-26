@@ -3,7 +3,7 @@ import unittest
 from src.absa.data import Example, SpanLabel
 from src.absa.metrics import evaluate_exact
 from src.absa.postprocess import postprocess_spans
-from src.absa.tags import bio_to_spans, spans_to_bio, spans_to_tags, tags_to_spans
+from src.absa.tags import bio_to_spans, spans_to_bio, spans_to_tags, spans_to_tags_with_offsets, tags_to_spans
 from src.absa.train_transformer import ids_to_spans
 
 
@@ -30,6 +30,27 @@ class AbsaCoreTests(unittest.TestCase):
         spans = tags_to_spans(tags, token_spans)
 
         self.assertEqual(tags[:3], ["B-BATTERY#POSITIVE", "L-BATTERY#POSITIVE", "U-CAMERA#NEGATIVE"])
+        self.assertEqual(spans, ex.labels)
+
+    def test_char_unit_roundtrip_recovers_span_inside_regex_token(self):
+        ex = Example("máy quá OKPin trâu", [SpanLabel(10, 18, "BATTERY#POSITIVE")])
+
+        token_tags, token_offsets = spans_to_tags(ex, scheme="bio")
+        token_spans = tags_to_spans(token_tags, token_offsets)
+        char_offsets = [(idx, idx + 1, char) for idx, char in enumerate(ex.text)]
+        char_tags, char_offsets = spans_to_tags_with_offsets(ex, char_offsets, scheme="bio")
+        char_spans = tags_to_spans(char_tags, char_offsets)
+
+        self.assertEqual(token_spans, [SpanLabel(8, 18, "BATTERY#POSITIVE")])
+        self.assertEqual(char_spans, ex.labels)
+
+    def test_char_unit_roundtrip_preserves_trailing_space(self):
+        ex = Example("pin trâu thật", [SpanLabel(0, 9, "BATTERY#POSITIVE")])
+
+        char_offsets = [(idx, idx + 1, char) for idx, char in enumerate(ex.text)]
+        tags, offsets = spans_to_tags_with_offsets(ex, char_offsets, scheme="bio")
+        spans = tags_to_spans(tags, offsets)
+
         self.assertEqual(spans, ex.labels)
 
     def test_exact_metric(self):

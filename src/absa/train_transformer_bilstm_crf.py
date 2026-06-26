@@ -36,8 +36,8 @@ def set_seed(seed: int) -> None:
     torch.cuda.manual_seed_all(seed)
 
 
-def make_transformer_instances(examples, label2id, scheme, tokenizer, max_length):
-    base_instances = make_instances(examples, label2id, scheme)
+def make_transformer_instances(examples, label2id, scheme, tokenizer, max_length, unit):
+    base_instances = make_instances(examples, label2id, scheme, unit=unit)
     return [encode_base_instance(base, tokenizer, max_length) for base in base_instances]
 
 
@@ -201,6 +201,7 @@ def main() -> None:
     parser.add_argument("--data-dir", default="data")
     parser.add_argument("--output-dir", default="outputs/phobert-bilstm-crf")
     parser.add_argument("--tag-scheme", default="bio", choices=["bio", "bilou"])
+    parser.add_argument("--unit", default="token", choices=["token", "char"])
     parser.add_argument("--hidden-size", type=int, default=512)
     parser.add_argument("--layers", type=int, default=1)
     parser.add_argument("--char-dim", type=int, default=64)
@@ -231,12 +232,16 @@ def main() -> None:
     labels = build_sequence_labels(span_labels, args.tag_scheme)
     label2id = {label: idx for idx, label in enumerate(labels)}
     id2label = {idx: label for label, idx in label2id.items()}
-    char_vocab = build_char_vocab(train_examples)
+    char_vocab = build_char_vocab(train_examples, unit=args.unit)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=False)
     transformer = AutoModel.from_pretrained(args.model_name)
-    train_instances = make_transformer_instances(train_examples, label2id, args.tag_scheme, tokenizer, args.max_length)
-    dev_instances = make_transformer_instances(dev_examples, label2id, args.tag_scheme, tokenizer, args.max_length)
+    train_instances = make_transformer_instances(
+        train_examples, label2id, args.tag_scheme, tokenizer, args.max_length, args.unit
+    )
+    dev_instances = make_transformer_instances(
+        dev_examples, label2id, args.tag_scheme, tokenizer, args.max_length, args.unit
+    )
     model = TransformerBiLstmCrf(
         transformer,
         len(char_vocab),

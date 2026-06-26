@@ -125,6 +125,7 @@ def main() -> None:
     parser.add_argument("--data-dir", default="data")
     parser.add_argument("--output-dir", default="outputs/bilstm-crf")
     parser.add_argument("--tag-scheme", default="bio", choices=["bio", "bilou"])
+    parser.add_argument("--unit", default="token", choices=["token", "char"])
     parser.add_argument("--word-dim", type=int, default=300)
     parser.add_argument("--char-dim", type=int, default=64)
     parser.add_argument("--char-out", type=int, default=150)
@@ -152,11 +153,16 @@ def main() -> None:
     labels = build_sequence_labels(span_labels, args.tag_scheme)
     label2id = {label: idx for idx, label in enumerate(labels)}
     id2label = {idx: label for label, idx in label2id.items()}
-    word_vocab = build_vocab(train_examples, min_freq=args.min_word_freq, lowercase=not args.no_lowercase)
-    char_vocab = build_char_vocab(train_examples)
+    word_vocab = build_vocab(
+        train_examples,
+        min_freq=args.min_word_freq,
+        lowercase=not args.no_lowercase,
+        unit=args.unit,
+    )
+    char_vocab = build_char_vocab(train_examples, unit=args.unit)
 
-    train_instances = make_instances(train_examples, label2id, args.tag_scheme)
-    dev_instances = make_instances(dev_examples, label2id, args.tag_scheme)
+    train_instances = make_instances(train_examples, label2id, args.tag_scheme, unit=args.unit)
+    dev_instances = make_instances(dev_examples, label2id, args.tag_scheme, unit=args.unit)
 
     model = BiLstmCrf(
         len(word_vocab),
