@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader, Dataset
 from .crf import LinearChainCRF
 from .data import Example, SpanLabel, iter_token_spans, read_jsonl, write_jsonl
 from .metrics import evaluate_exact
-from .tags import build_sequence_labels, spans_to_tags, tags_to_spans
+from .tags import build_sequence_labels, spans_to_tags, spans_to_tags_with_offsets, tags_to_spans
 
 
 PAD = "<PAD>"
@@ -59,11 +59,19 @@ def set_all_seeds(seed: int) -> None:
     torch.cuda.manual_seed_all(seed)
 
 
-def build_vocabs(examples: list[Example], lowercase: bool = True) -> tuple[Vocab, Vocab]:
+def iter_sequence_spans(text: str, unit: str) -> list[tuple[int, int, str]]:
+    if unit == "token":
+        return iter_token_spans(text)
+    if unit == "char":
+        return [(idx, idx + 1, char) for idx, char in enumerate(text)]
+    raise ValueError(f"Unsupported sequence unit: {unit}")
+
+
+def build_vocabs(examples: list[Example], lowercase: bool = True, unit: str = "token") -> tuple[Vocab, Vocab]:
     word_vocab = Vocab()
     char_vocab = Vocab()
     for ex in examples:
-        for _, _, token in iter_token_spans(ex.text):
+        for _, _, token in iter_sequence_spans(ex.text, unit):
             word_vocab.add(token.lower() if lowercase else token)
             for char in token:
                 char_vocab.add(char)
@@ -71,7 +79,7 @@ def build_vocabs(examples: list[Example], lowercase: bool = True) -> tuple[Vocab
 
 
 class ExactCrfDataset(Dataset):
-    def __init__(self, examples, word_vocab, char_vocab, label2id, tokenizer, max_length, lowercase=True):
+    def __init__(self, examples, word_vocab, char_vocab, label2id, tokenizer, max_length, lowercase=True, unit="token"):
         self.examples = examples
         self.features = []
         self.word_vocab = word_vocab
@@ -80,29 +88,65 @@ class ExactCrfDataset(Dataset):
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.lowercase = lowercase
+        self.unit = unit
         self._build()
 
     def _build(self) -> None:
         for ex in self.examples:
-            tag_strings, offsets = spans_to_tags(ex, scheme="bio")
+            if self.unit == "token":
+                tag_strings, offsets = spans_to_tags(ex, scheme="bio")
+            else:
+                offsets = iter_sequence_spans(ex.text, self.unit)
+                tag_strings, offsets = spans_to_tags_with_offsets(ex, offsets, scheme="bio")
             tokens = [token for _, _, token in offsets]
-            encoded = self.tokenizer(
-                tokens,
-                is_split_into_words=True,
-                add_special_tokens=True,
-                truncation=True,
-                max_length=self.max_length,
-                return_attention_mask=True,
-            )
-            hf_word_ids = encoded.word_ids()
-            first_subword_by_word: dict[int, int] = {}
-            for subword_idx, word_idx in enumerate(hf_word_ids):
-                if word_idx is not None and word_idx not in first_subword_by_word:
-                    first_subword_by_word[word_idx] = subword_idx
-            kept_word_ids = sorted(first_subword_by_word)
-            if not kept_word_ids:
-                continue
-            kept_word_count = max(kept_word_ids) + 1
+            if self.unit == "token":
+                encoded = self.tokenizer(
+                    tokens,
+                    is_split_into_words=True,
+                    add_special_tokens=True,
+                    truncation=True,
+                    max_length=self.max_length,
+                    return_attention_mask=True,
+                )
+                hf_word_ids = encoded.word_ids()
+                first_subword_by_word: dict[int, int] = {}
+                for subword_idx, word_idx in enumerate(hf_word_ids):
+                    if word_idx is not None and word_idx not in first_subword_by_word:
+                        first_subword_by_word[word_idx] = subword_idx
+                kept_word_ids = sorted(first_subword_by_word)
+                if not kept_word_ids:
+                    continue
+                kept_word_count = max(kept_word_ids) + 1
+                first_subword_indices = [first_subword_by_word[i] for i in range(kept_word_count)]
+            else:
+                encoded = self.tokenizer(
+                    ex.text,
+                    add_special_tokens=True,
+                    truncation=True,
+                    max_length=self.max_length,
+                    return_attention_mask=True,
+                    return_offsets_mapping=True,
+                )
+                first_subword_by_char: dict[int, int] = {}
+                max_covered_char = 0
+                for subword_idx, span in enumerate(encoded.pop("offset_mapping")):
+                    start, end = span
+                    if end <= start:
+                        continue
+                    max_covered_char = max(max_covered_char, end)
+                    for char_idx in range(start, end):
+                        first_subword_by_char.setdefault(char_idx, subword_idx)
+                kept_word_count = 0
+                first_subword_indices = []
+                for char_idx in range(len(tokens)):
+                    if char_idx >= len(ex.text):
+                        break
+                    if char_idx >= max_covered_char:
+                        break
+                    first_subword_indices.append(first_subword_by_char.get(char_idx, 0))
+                    kept_word_count += 1
+                if kept_word_count == 0:
+                    continue
             kept_tokens = tokens[:kept_word_count]
             self.features.append(
                 Feature(
@@ -111,7 +155,7 @@ class ExactCrfDataset(Dataset):
                     offsets=offsets[:kept_word_count],
                     input_ids=encoded["input_ids"],
                     attention_mask=encoded["attention_mask"],
-                    first_subword_indices=[first_subword_by_word[i] for i in range(kept_word_count)],
+                    first_subword_indices=first_subword_indices,
                     word_ids=[self.word_vocab.get_id(token.lower() if self.lowercase else token) for token in kept_tokens],
                     char_ids=[[self.char_vocab.get_id(char) for char in token] for token in kept_tokens],
                     labels=[self.label2id[tag] for tag in tag_strings[:kept_word_count]],
@@ -275,6 +319,7 @@ def main() -> None:
     parser.add_argument("--data-dir", default="data")
     parser.add_argument("--output-dir", default="outputs/xlmr-bilstm-crf-exact")
     parser.add_argument("--model-name", default="FacebookAI/xlm-roberta-base")
+    parser.add_argument("--unit", default="token", choices=["token", "char"])
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--max-length", type=int, default=256)
@@ -301,16 +346,24 @@ def main() -> None:
     train_examples = read_jsonl(Path(args.data_dir) / "train.jsonl")
     dev_examples = read_jsonl(Path(args.data_dir) / "dev.jsonl")
     test_examples = read_jsonl(Path(args.data_dir) / "test.jsonl") if args.eval_test else []
-    word_vocab, char_vocab = build_vocabs(train_examples)
+    word_vocab, char_vocab = build_vocabs(train_examples, unit=args.unit)
     span_labels = sorted({label.label for ex in train_examples for label in ex.labels})
     labels = build_sequence_labels(span_labels, scheme="bio")
     label2id = {label: idx for idx, label in enumerate(labels)}
     id2label = {idx: label for label, idx in label2id.items()}
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
-    train_dataset = ExactCrfDataset(train_examples, word_vocab, char_vocab, label2id, tokenizer, args.max_length)
-    dev_dataset = ExactCrfDataset(dev_examples, word_vocab, char_vocab, label2id, tokenizer, args.max_length)
-    test_dataset = ExactCrfDataset(test_examples, word_vocab, char_vocab, label2id, tokenizer, args.max_length) if args.eval_test else None
+    train_dataset = ExactCrfDataset(
+        train_examples, word_vocab, char_vocab, label2id, tokenizer, args.max_length, unit=args.unit
+    )
+    dev_dataset = ExactCrfDataset(
+        dev_examples, word_vocab, char_vocab, label2id, tokenizer, args.max_length, unit=args.unit
+    )
+    test_dataset = (
+        ExactCrfDataset(test_examples, word_vocab, char_vocab, label2id, tokenizer, args.max_length, unit=args.unit)
+        if args.eval_test
+        else None
+    )
     collate = lambda batch: collate_exact(batch, tokenizer.pad_token_id)
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=collate)
     dev_loader = DataLoader(dev_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate)
