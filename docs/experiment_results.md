@@ -7,6 +7,7 @@ All scores below are exact span + label micro scores on `data/dev.jsonl`.
 | Experiment | Precision | Recall | F1 | Notes |
 |---|---:|---:|---:|---|
 | PhoBERT + BiLSTM-CRF | 0.5943 | 0.5966 | 0.5954 | Best clean score so far; CRF substantially improves boundary/label consistency. |
+| PhoBERT + BiLSTM-CRF repeat | 0.5956 | 0.5930 | 0.5943 | Very close to best; slightly higher precision but lower recall. |
 | BiLSTM-CRF | 0.5642 | 0.5374 | 0.5505 | Strong non-transformer CRF baseline; beats all token-classification transformer runs. |
 | XLM-R BIO raw | 0.4097 | 0.5539 | 0.4710 | Best plain transformer token-classification run. |
 | PhoBERT base v2 BIO word-aligned | 0.4215 | 0.5243 | 0.4673 | Very close to XLM-R BIO; higher precision, lower recall. |
