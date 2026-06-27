@@ -36,12 +36,16 @@ def set_seed(seed: int) -> None:
     torch.cuda.manual_seed_all(seed)
 
 
-def make_transformer_instances(examples, label2id, scheme, tokenizer, max_length, unit):
+def make_transformer_instances(examples, label2id, scheme, tokenizer, max_length, unit, model_vocab_size):
     base_instances = make_instances(examples, label2id, scheme, unit=unit)
-    return [encode_base_instance(base, tokenizer, max_length) for base in base_instances]
+    return [encode_base_instance(base, tokenizer, max_length, model_vocab_size) for base in base_instances]
 
 
-def encode_base_instance(base, tokenizer, max_length):
+def sanitize_token_ids(token_ids: list[int], unk_token_id: int, vocab_size: int) -> list[int]:
+    return [token_id if isinstance(token_id, int) and 0 <= token_id < vocab_size else unk_token_id for token_id in token_ids]
+
+
+def encode_base_instance(base, tokenizer, max_length, model_vocab_size):
     max_content_length = max_length - tokenizer.num_special_tokens_to_add(pair=False)
     pieces: list[str] = []
     piece_to_word_content: list[int] = []
@@ -58,12 +62,17 @@ def encode_base_instance(base, tokenizer, max_length):
             break
 
     piece_ids = tokenizer.convert_tokens_to_ids(pieces)
-    special_mask = tokenizer.get_special_tokens_mask(piece_ids, already_has_special_tokens=False)
+    unk_token_id = tokenizer.unk_token_id if tokenizer.unk_token_id is not None else 0
+    piece_ids = sanitize_token_ids(piece_ids, unk_token_id, model_vocab_size)
     input_ids = tokenizer.build_inputs_with_special_tokens(piece_ids)
+    input_ids = sanitize_token_ids(input_ids, unk_token_id, model_vocab_size)
+    special_mask = tokenizer.get_special_tokens_mask(input_ids, already_has_special_tokens=True)
     piece_to_word = []
     content_idx = 0
     for is_special in special_mask:
         if is_special:
+            piece_to_word.append(-1)
+        elif content_idx >= len(piece_to_word_content):
             piece_to_word.append(-1)
         else:
             piece_to_word.append(piece_to_word_content[content_idx])
@@ -236,11 +245,12 @@ def main() -> None:
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=False)
     transformer = AutoModel.from_pretrained(args.model_name)
+    model_vocab_size = transformer.get_input_embeddings().num_embeddings
     train_instances = make_transformer_instances(
-        train_examples, label2id, args.tag_scheme, tokenizer, args.max_length, args.unit
+        train_examples, label2id, args.tag_scheme, tokenizer, args.max_length, args.unit, model_vocab_size
     )
     dev_instances = make_transformer_instances(
-        dev_examples, label2id, args.tag_scheme, tokenizer, args.max_length, args.unit
+        dev_examples, label2id, args.tag_scheme, tokenizer, args.max_length, args.unit, model_vocab_size
     )
     model = TransformerBiLstmCrf(
         transformer,
