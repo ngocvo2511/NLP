@@ -147,7 +147,7 @@ class TransformerBiLstmCrf(nn.Module):
         reps = hidden.new_zeros(batch_size, max_words, hidden.size(-1))
         counts = hidden.new_zeros(batch_size, max_words, 1)
         for row in range(batch_size):
-            valid = piece_to_word[row] >= 0
+            valid = (piece_to_word[row] >= 0) & (piece_to_word[row] < max_words)
             if valid.any():
                 word_ids = piece_to_word[row, valid]
                 reps[row].index_add_(0, word_ids, hidden[row, valid])
