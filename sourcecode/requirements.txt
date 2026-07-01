@@ -1,0 +1,10 @@
+pandas>=2.0
+matplotlib>=3.7
+seaborn>=0.13
+numpy>=1.26
+scikit-learn>=1.4
+torch>=2.2
+transformers>=4.41
+accelerate>=0.30
+datasets>=2.19
+seqeval>=1.2

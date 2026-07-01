@@ -1,0 +1,53 @@
+{
+  "total_reviews": 11122,
+  "total_spans": 35396,
+  "split_reviews": {
+    "train": 7785,
+    "dev": 1112,
+    "test": 2225
+  },
+  "split_spans": {
+    "train": 24771,
+    "dev": 3582,
+    "test": 7043
+  },
+  "aspect": {
+    "GENERAL": 8057,
+    "PERFORMANCE": 6906,
+    "BATTERY": 5630,
+    "FEATURES": 3994,
+    "CAMERA": 3117,
+    "SER&ACC": 2635,
+    "DESIGN": 2141,
+    "PRICE": 1389,
+    "SCREEN": 1382,
+    "STORAGE": 145
+  },
+  "sentiment": {
+    "POSITIVE": 21832,
+    "NEGATIVE": 11350,
+    "NEUTRAL": 2214
+  },
+  "aspects_per_review": {
+    "0": 225,
+    "1": 1875,
+    "2": 2863,
+    "3": 2714,
+    "4": 2043,
+    "5": 939,
+    "6": 362,
+    "7": 81,
+    "8": 17,
+    "9": 3
+  },
+  "multi_aspect_reviews": 9022,
+  "empty_reviews": 225,
+  "whitespace_spans": 1282,
+  "nfc_changed_reviews": 331,
+  "preprocessing_impact": {
+    "reviews_changed_by_nfc": 331,
+    "spans_trimmed": 1282,
+    "labels_dropped": 0,
+    "label_distribution_changed": false
+  }
+}

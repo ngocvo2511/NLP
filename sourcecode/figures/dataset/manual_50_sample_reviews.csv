@@ -1,0 +1,51 @@
+﻿review_id,text,text_len,num_spans,num_aspects
+train-101,Máy mượt lướt web chơi game ok. Màn hình lớn thoải mái xem phim. Apple là thương hiệu tốt nhất.,95,3,3
+train-1042,Cập nhật lên miu 11 ngồi rần wifi đủ 5 vạch và cả mạng dữ liệu chậm bin thì mau hết,83,2,2
+train-1188,"Mn có ai giống mình không bật dữ liệu Di Động, wifi....trên thanh thông báo nó cứ chậm tầm 1,5-2,5s làm khó chịu chứ mấy cái điện thoại 3tr đang xài còn nhanh hơn.với khi xem YouTube xoay điện thoại sang góc khác thì ko xoay theo phải lắc một cái mới chịu xoay. Còn mọi thứ rất ổn",280,3,2
+train-132,"Phục vụ tận tình, chu đáo, máy dùng tốt, thêm chương trình giảm giá nữa quá tuyệt vời. Phải vào đánh giá ngay",109,3,2
+train-1320,"Máy tạm,game lag,giật liên tục,pin tut nhanh,khá thất vọng với siêu phẩm cua nhà samsung.chờ bản cập nhật mới xem ntn",117,4,3
+train-1405,Lên mua redmi 8 k có tư vấn mua cái máy này . h chỉ muốn lên chọi vào mặt nv :) sản phẩm bị lỗi mà dám đứng đó giới thiệu pr các thứ ??? Mà lỗi cũng hay lắm lúc test vs mới mua về k bị đâu . chưa dc 1 tuần nó cứ cà giật cà giật k xài cái gì lướt lướt ngoài màn hình cũng giật :) cửa hàng lớn có mặt trên cả nước mà làm ăn như lừa đảo ... Sợ . đánh giá hết 1 lần thì k duyệt . lần này k duyệt nữa thì lên FB mà giải thích nha,424,2,2
+train-1426,Loa trong thì bt còn bật loa ngoài thì đầu dây bên kia ko nghe đc j luôn. Mai phải xuống bảo hành,97,1,1
+train-1438,Mình mua máy ngày 9.11 thì mình cảm nhân máy tương đối pin tuột nhanh nhưng cũng đủ sử dụng trong ngày sạc khoảng 2 tiếng là đầy máy cũng khá mượt còn cảm biến vân tay thì ổn. Camera chụp hình đẹp nét.,201,4,4
+train-1768,"Mới dùng được 2 tuần. Tuần đầu camera hay đơ, và nóng máy, tuần thứ 2 camera thi thoảng bị đơ, máy cũng hay bị đơ không lm gì được phải khơi động lại, lâu lâu máy nóng và khi nóng chắc chắn bị đơ. Thi thoảng bị lỗi âm thanh không nhận driver âm thanh, mất cả loa trong và loa ngoài, mất rung luôn. Xin hỏi admin như vậy bị gì ạ",327,5,3
+train-2018,Sản phẩm sài quá êm pin trâu lúc đầu hoang mang về Google nhưng được tư vấn rõ ràng an tâm sử dụng. Mấy hôm trước mới mua 1 con về sài quá êm. Bn Liêm nhân viên Huawei 628 Kha Vạn Cân hỗ trợ rất nhiệt tình cho 5 sao luôn.,221,3,3
+train-2112,Trong lúc chơi game nó hay hiện cái viền xanh ngày nút thoát ko biết nó có bị lỗi gì ko anh,91,1,1
+train-23,"Máy dùng rất tốt, cam,cấu hình đều ổn. Nhưng nếu tải game trên web thì hay bị lỗi ứng dụng tự đóng,",99,4,3
+train-2333,Mua chưa được một tháng thì bị đen màn hình không lên được ...bị hao pin nhanh bị lác nhảy màn hình mình đi bảo hành tới 2 lần rồi nhân viên thì bảo không sao .không sao sao phải khổ đi bảo hành . Bỏ 6 triệu ra mua cái điện thoại thật thất vọng .lời khuyên cho các bạn muốn mua thật sự quá tệ .nhiều lúc chỉ muốn đập đi nhưng con số 6 triệu không hề nhỏ,353,6,5
+train-2569,"Mình là fan Xiaomi khá lâu. Lúc trước từng xài Xiaomi redmi note 4,đổi qua redmi note 7 được 4 ngày rồi. Xài rất tốt, hiệu năng mượt mà, cam khá đẹp, pin trâu nhưng vẫn kh trâu bằng redmi note 4. Màn hình nét đẹp, nói chung ổn định trong tầm giá 5tr.",250,6,5
+train-2882,Pin ổn đủ xài. Độ phản hồi chậm quá chậm. Nhấn đúp mở màn hình không lên luôn. 4g mà như 3g ý...,96,2,2
+train-3012,Con này sài rất OK nhá. chiến game rất tốt. 2 ngày đâu tiên sài điện thoại rất nóng pin tụt nhanh. nhưng những ngày sau sài không nóng tý nào và pin cũng khá trâu. Chỉ có cái clip FB nếu mạng yếu thì hơi mờ và cam trước không đẹp. Nhưng tầm giá này thì nhất hạng. NV nhiệt tình. Bạn nào chiến game thì đừng bâng khuâng nửa.,323,6,5
+train-3739,"Máy sử dụng đến ngày thứ 9 thì xuất hiện tình trạng lag máy, màng hình không nhạy.",82,1,1
+train-3824,"Pin cực trâu, cam ổn, vân tay khoá các kiểu cực nhạy. 2990 đc như v là perfect 🤘",80,4,4
+train-4010,Điện thoại này có rất nhiều lỗi. Nói chung có nhiều ứng dụng chưa hoạt động tốt. VD như quay video bị giật. Chụp hình kg sắc nét như quảng cáo. Đọc báo rất phức tạp. Từ khi tui xài điện thoại này là tui ít xem tin tức 24h trước kia xài Samsung 1 ngày tui đọc báo vài lần. Nói tóm lại đề nghi nhà phần mềm nâng cấp bản sửa lỗi,325,4,3
+train-4031,"Xài khá ổn trong tầm giá, khuyên mọi người nên mua các tác vụ rất mượt mà mỗi tội camera hơi xấu khi chụp vào tối",113,3,3
+train-4222,5 sao nè hàng Việt Nam Chất lượng cao Pin trâu kinh khủng Chơi game mượtSạc nhanh chỉ 2h15' (1% - 100%)Màn hình đẹp to rõBảo hành tốt Quá ok Các bạn nên mua,156,7,5
+train-453,"Toang.. Kính corning gorilla 3 cho siêu phẩm.. Họ sài 6 xắp lên 7 luôn rồi ..Thua cấu hình Oppo Find X2 , X2 18 củ.. Con này 15 củ là vừa. Thất vọng khá nhiều",158,3,3
+train-487,"Sau 1 tháng sd. Tốt : màn hình đẹp, mượt. Âm thanh ok. Camera đẹp. Tệ: máy rất mau nóng, pin tuột nhanh.1",105,6,5
+train-4872,"máy sử dụng rất tốt, mượt mà, nhanh, pin khỏe, thiết kế đẹp, chụp ảnh nét, có chụp ảnh xóa phông. tôi rất ưng ý về sản phẩm, Nhân viên phục vụ tận tình, chu đáo. tôi rất hài lòng",178,8,6
+train-5055,Chán ss ra bản cập nhật ngày 24-10. Tưởng đâu bản cập nhật mới nhất của ss vá lổi của bản cập nhật trứớc về vấn đề pin. Ko ngờ ss ko nghe người dùng ra bản cập nhật ngày càng tệ cập nhật sống pin suống rất nhanh tụt như tượt quần chc ss đang muốn người đung chuyện qa hãng khác xài. Ra bản cấp nhật chả thấy sửa lổi j chỉ khiến máy suống cấp thêm hiệu năng pin giãm rõ rệt,372,2,2
+train-5187,Máy ok camera lâu lâu hơi lỗi khởi động. Máy hết bị nhân viên tgdd nhiệt tình mới mua dùng thấy máy chạy ok ko có hiện tượng dựt lag,132,5,4
+train-5333,Giá rẻ hơn chút thì tuyệt hơn nữa.Cam đẹp.Chip mạnh hơn nữa cho những ai chơi game,82,3,3
+train-5430,Sản phẩm tốt. Chỉ không thích phần phát wifi của điện thoại.Nói chung hài lòng với chất lượng.,94,3,2
+train-5476,Mua dc 4 ngày.cảm thấy ok.vừa túi tiền.cảm ứng vân tay cũng dc nếu tay ko bị bẩn sẽ mở nhạy đấy.mở khóa khuôn mặt thì tốt.chơi liên quân msx cấu hình ok nha.nghe gọi rõ.đáng mua đó mấy bạn,188,6,4
+train-5617,Máy em mới mua được hơn 2 tháng mà dung lượng pin giảm còn 96% Quá nhanh luôn ạ 🙂,81,1,1
+train-5842,"Sản phẩm hơi to! Cấu hình khủng, pin trâu,game liên quân mượt!!!! Sạc nhanh đầy! Thỉnh thoảng hay văng game k rõ vì sao!",120,6,3
+train-5993,Sản phẩm rất tốt máy khoẻ không giật lagBỏ tiền mua ip7 plus này quả không phí đồng tiền Thái độ phục vụ của nhân viên tgdđ rất tốt,131,3,3
+train-6013,"máy mua gần 1 tháng, tại sao quay video trên 1 phút rồi dừng lại thì lại bị đơ màn hình vậy, thủ cả mấy lần đều bị vậy, tại sao vậy",131,1,1
+train-6068,"Máy xàI mượt, không giật lag, pin sử dụng lâu. Dung lượng 128gb rất nhiều cho lưu trữ. Chưa lên phiên bản ios 11. Nên máy còn dùng rất tốt.",139,4,4
+train-6264,"Sau khi mình sử dụng Note 9S được vài ngày và quyết định thêm 500k lấy Note 9 Pro. Note 9 Pro thấy cũng đáng tiền hơn Note 9S. Note 9 Pro được cải hiện sạc nhanh 30W. Camera 64MP thấy cũng ổn áp. Cải hiện Motor rung như mấy dòng Cao cấp. Có luôn NFC mà Note 9S lại không có. Mình thích màu xanh lá của Note 9 Pro ( xanh lá đặc biệt ) Bắt wifi 5Ghz quá ngon, Sóng 4G cũng căng đét k có yếu gì cả. Còn độ bền mình sẽ đánh giá sau. Hihi",433,6,5
+train-6490,Máy ngon phát wi-fi quá tốt ghe gọi rõ chắc chắn lên mua tuyệt vời nếu có 10 sao thì mình sẽ đánh 10 sao,104,3,2
+train-6642,"Mình không hài lòng với máy chút nào về máy đã mua vẫn còn nhiều lỗi chưa khắc phục đc, máy mua hồi 15/4 giờ đã 27/4 không biết sao mình mua ngay lô bị máy lỗi, đổi một lần vẫn gặp phải máy lỗi màn hình bị hở sáng với nút nguồn, jack type C thì rung. Nguồn với Pin thì có hiện tượng lạ, phần mềm thông số không thể hiểu nổiNhư app mp3 xài có 5s mà hao pin hơn chơi liên quân tiếng đồng hồ.Mua nên cân nhắc trong thời gian này !",427,6,4
+train-6705,"mua máy đổi trả nhưng rất vừa ý. màn hình ko mượt mà nhưng cảm giác vuốt chạm ổn, viền màn hình dày nhưng dc vát cong ko gây cấn tay , màn TFT nhưng hiển thị sáng rõ, góc nhìn 180 độ. Kết nhất là quả pin trâu: 4000 mAh coi youtube ( 5 phim phân giải 480 và 720 tùy phim, gần 11 tiếng) pin từ 97% về 30%.",303,3,3
+train-6810,Em muốn đổi realme5i 3g 32 lấy con nay phải bù vào bn tiền vậy shop...em mua được hơn 1 tháng rồi,97,0,0
+train-6889,"Máy tốt mọi thứ đều ổn .....có điều chơi game bằng 4g hơi bị tốn pin với lại để không nó cũng bị sụt pin ,,,,còn lại mọi thứ thì oke một ❤️",139,3,2
+train-7056,"Mua 2 ngày , game giật vỡ mặt ,. Hình ảnh thì k thể hiện hình ảnh độ phân giải cáo là sao , rõ hiểu luôn , máy này mà vẫn có hình ảnh k thể xem đi ạ",148,2,2
+train-7126,Mới dụng đc 3 ngày nhưng thấy cũng đc .. nếu chơi game ma hết pin thi máy nào cũng vậy ...kết nối bằng wifi thì đỡ hao pin với nóng máy hơn kết nối dữ liệu .. t chỉ ko hiểu là sạc nhanh như vậy có hại pin ko nữa ..,214,2,2
+train-7309,"Máy ok nhưng ram 6gp mới mua 2 ngày mà chơi liên quân lag,khi để chất lượng hình ảnh thấp... Hơi thất vọng,thua con redmi note 5 của mình về phần chơi game",155,4,3
+train-7413,"Tốt nên mua mượt lắm, xài sướng lắm luôn chơi liên quân pubg mượt camera đẹp nhưng k hiểu sao video call zalo mess hình ảnh k đẹp",129,3,3
+train-7479,"Nếu mua chơi game liên quân đừng ai mua giật lg kinh khủng . Pin trâu . Thua . chip Quacom Snapdragon . Muốn chơi game tốt mua máy chip Snapdragon 665 hoặc 675 , 710 trở lên .",175,2,2
+train-7492,"Máy ngón, cực ngon :))) chơi game mượt, pin trâu, chụp ảnh đẹp... Tóm lại là tốt",80,5,4
+train-7530,"Quá kém, máy hay đứng và phản ứng chậm, vân tay nhiều lúc không nhận được.Nói chung là quá tệ so với số tiền bỏ ra.",115,4,3
+train-7539,bạn mình mới mua thấy rất ok. Mình thích con này có cơ hội nên dùng thử em này :D,81,1,1
+train-7591,Ms mua lúc 5/7 dùng tới h cảm nhận riêng của e là máy khá là ok vì máy e ko chơi game chỉ dùng fb youtube chụp ảnh và những ứng khác thấy máy khá mượt có cái là chụp 1 chạm e chưa hiểu lắm còn lại thì ok hết á,209,3,2
+train-7617,"Mới mua 1 ngày, xài cũng ổn lắm. Mình chỉ thắc mắc sao nghe đc có 1 bên loa? Hay do đt giờ nó thế",97,2,2
